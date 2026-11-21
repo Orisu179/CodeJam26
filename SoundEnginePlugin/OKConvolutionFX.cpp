@@ -29,6 +29,41 @@ the specific language governing permissions and limitations under the License.
 
 #include <AK/AkWwiseSDKVersion.h>
 
+namespace
+{
+    // Fast ~48-byte fingerprint so replacing an IR with another WAV of the same
+    // size at the same address still triggers SetIR().
+    AkUInt32 ComputeMediaSignature(const AkUInt8* in_pData, AkUInt32 in_uSize)
+    {
+        if (!in_pData || in_uSize == 0)
+            return 0;
+
+        AkUInt32 hash = 2166136261u;
+        const AkUInt32 headerBytes = (in_uSize < sizeof(OKIRMediaHeader))
+            ? in_uSize
+            : static_cast<AkUInt32>(sizeof(OKIRMediaHeader));
+
+        for (AkUInt32 i = 0; i < headerBytes; ++i)
+        {
+            hash ^= in_pData[i];
+            hash *= 16777619u;
+        }
+
+        if (in_uSize > headerBytes)
+        {
+            const AkUInt32 payloadSize = in_uSize - headerBytes;
+            const AkUInt32 stride = (payloadSize > 16u) ? (payloadSize / 16u) : 1u;
+            for (AkUInt32 offset = 0; offset < payloadSize; offset += stride)
+            {
+                hash ^= in_pData[headerBytes + offset];
+                hash *= 16777619u;
+            }
+        }
+
+        return hash;
+    }
+}
+
 AK::IAkPlugin* CreateOKConvolutionFX(AK::IAkPluginMemAlloc* in_pAllocator)
 {
     return AK_PLUGIN_NEW(in_pAllocator, OKConvolutionFX());
@@ -45,12 +80,20 @@ OKConvolutionFX::OKConvolutionFX()
     : m_pParams(nullptr)
     , m_pAllocator(nullptr)
     , m_pContext(nullptr)
+    , m_pEngine(nullptr)
+    , m_pLastMediaData(nullptr)
+    , m_uLastMediaSize(0)
+    , m_uLastMediaSignature(0)
 {
 }
 
 OKConvolutionFX::~OKConvolutionFX() = default;
 
-AKRESULT OKConvolutionFX::Init(AK::IAkPluginMemAlloc* in_pAllocator, AK::IAkEffectPluginContext* in_pContext, AK::IAkPluginParam* in_pParams, AkAudioFormat& in_rFormat)
+AKRESULT OKConvolutionFX::Init(
+    AK::IAkPluginMemAlloc* in_pAllocator,
+    AK::IAkEffectPluginContext* in_pContext,
+    AK::IAkPluginParam* in_pParams,
+    AkAudioFormat& in_rFormat)
 {
     m_pParams    = static_cast<OKConvolutionFXParams*>(in_pParams);
     m_pAllocator = in_pAllocator;
@@ -67,29 +110,27 @@ AKRESULT OKConvolutionFX::Init(AK::IAkPluginMemAlloc* in_pAllocator, AK::IAkEffe
     if (res != AK_Success)
         return res;
 
-    AkUInt8* pMediaData = nullptr;
-    AkUInt32 uMediaSize = 0;
-    m_pContext->GetPluginMedia(0, pMediaData, uMediaSize);
-    if (pMediaData && uMediaSize > 0)
-    {
-        res = m_pEngine->SetIR(pMediaData, uMediaSize);
-        if (res != AK_Success)
-            return res;
-    }
-
-    return AK_Success;
+    return UpdateIRFromMedia(0);
 }
 
 AKRESULT OKConvolutionFX::Term(AK::IAkPluginMemAlloc* in_pAllocator)
 {
-    m_pEngine->Term(in_pAllocator); 
-    AK_PLUGIN_DELETE(in_pAllocator, m_pEngine);
+    if (m_pEngine)
+    {
+        m_pEngine->Term(in_pAllocator);
+        AK_PLUGIN_DELETE(in_pAllocator, m_pEngine);
+        m_pEngine = nullptr;
+    }
+
     AK_PLUGIN_DELETE(in_pAllocator, this);
     return AK_Success;
 }
 
 AKRESULT OKConvolutionFX::Reset()
 {
+    if (m_pEngine)
+        m_pEngine->Reset();
+
     return AK_Success;
 }
 
@@ -97,27 +138,21 @@ AKRESULT OKConvolutionFX::GetPluginInfo(AkPluginInfo& out_rPluginInfo)
 {
     out_rPluginInfo.eType = AkPluginTypeEffect;
     out_rPluginInfo.bIsInPlace = true;
-	out_rPluginInfo.bCanProcessObjects = false;
+    out_rPluginInfo.bCanProcessObjects = false;
     out_rPluginInfo.uBuildVersion = AK_WWISESDK_VERSION_COMBINED;
     return AK_Success;
 }
 
 void OKConvolutionFX::Execute(AkAudioBuffer* io_pBuffer)
 {
-    const AkUInt32 uNumChannels = io_pBuffer->NumChannels();
+    if (!m_pEngine)
+        return;
 
-    AkUInt16 uFramesProcessed;
-    for (AkUInt32 i = 0; i < uNumChannels; ++i)
-    {
-        AkReal32* AK_RESTRICT pBuf = (AkReal32* AK_RESTRICT)io_pBuffer->GetChannel(i);
+    // Detect if Wwise Authoring swapped the media slot while the bus stays active
+    UpdateIRFromMedia(0);
 
-        uFramesProcessed = 0;
-        while (uFramesProcessed < io_pBuffer->uValidFrames)
-        {
-            // Execute DSP in-place here
-            ++uFramesProcessed;
-        }
-    }
+    // Dry/wet gains are currently ignored inside ConvolutionEngine::Process()
+    m_pEngine->Process(io_pBuffer, 1.0f, 0.0f);
 }
 
 AKRESULT OKConvolutionFX::TimeSkip(AkUInt32 in_uFrames)
@@ -127,10 +162,43 @@ AKRESULT OKConvolutionFX::TimeSkip(AkUInt32 in_uFrames)
 
 bool OKConvolutionFX::SupportMediaRelocation() const
 {
-    return false;
+    // ConvolutionEngine copies IR samples into its own buffers, so relocating
+    // Wwise's underlying bank memory does not invalidate our engine state.
+    return true;
 }
 
-AKRESULT OKConvolutionFX::RelocateMedia(AkUInt8* string, AkUInt8* text)
+AKRESULT OKConvolutionFX::RelocateMedia(AkUInt8* in_pNewMedia, AkUInt8* in_pOldMedia)
 {
-    return AKRESULT::AK_Success;
+    // Keep our cached pointer aligned with Wwise's relocated address so
+    // UpdateIRFromMedia() does not falsely treat a memory move as a new IR.
+    if (m_pLastMediaData == in_pOldMedia)
+        m_pLastMediaData = in_pNewMedia;
+
+    return AK_Success;
+}
+
+AKRESULT OKConvolutionFX::UpdateIRFromMedia(AkUInt32 in_uMediaIndex)
+{
+    if (!m_pContext || !m_pEngine)
+        return AK_Fail;
+
+    AkUInt8* pMediaData = nullptr;
+    AkUInt32 uMediaSize = 0;
+    m_pContext->GetPluginMedia(in_uMediaIndex, pMediaData, uMediaSize);
+
+    const AkUInt32 uSignature = ComputeMediaSignature(pMediaData, uMediaSize);
+
+    if (pMediaData == m_pLastMediaData
+        && uMediaSize == m_uLastMediaSize
+        && uSignature == m_uLastMediaSignature)
+    {
+        return AK_Success;
+    }
+
+    // Update cache before returning so an invalid file isn't retried every audio block
+    m_pLastMediaData      = pMediaData;
+    m_uLastMediaSize      = uMediaSize;
+    m_uLastMediaSignature = uSignature;
+
+    return m_pEngine->SetIR(pMediaData, uMediaSize);
 }

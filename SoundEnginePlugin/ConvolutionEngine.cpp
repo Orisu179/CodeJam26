@@ -254,7 +254,7 @@ void ConvolutionEngine::Process(AkAudioBuffer* io_pBuffer, float /*in_fWetGain*/
     if (!m_pIrPartitions || m_uNumPartitions == 0 || !m_pChannels)
         return;
 
-    const AkUInt32 uChannelsToProcess = (std::min)(io_pBuffer->NumChannels(), m_uNumAudioChannels);
+    const AkUInt32 uChannelsToProcess = std::min(io_pBuffer->NumChannels(), m_uNumAudioChannels);
     const AkUInt32 uTotalFrames       = io_pBuffer->uValidFrames;
 
     for (AkUInt32 ch = 0; ch < uChannelsToProcess; ++ch)
@@ -273,7 +273,7 @@ void ConvolutionEngine::Process(AkAudioBuffer* io_pBuffer, float /*in_fWetGain*/
         AkUInt32 framesDone = 0;
         while (framesDone < uTotalFrames)
         {
-            const AkUInt32 chunkFrames = (std::min)(m_uBlockSize, uTotalFrames - framesDone);
+            const AkUInt32 chunkFrames = std::min(m_uBlockSize, uTotalFrames - framesDone);
 
             ProcessChannelBlock(
                 m_pChannels[ch],

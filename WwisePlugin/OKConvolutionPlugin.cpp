@@ -356,7 +356,7 @@ bool OKConvolutionPlugin::GetBankParameters(const GUID& in_guidPlatform, AK::Wwi
 
 void OKConvolutionPlugin::NotifyPluginMediaChanged()
 {
-    m_host.NotifyInternalDataChanged(AK::IAkPluginParam::ALL_PLUGIN_DATA_ID, false);
+    m_host.NotifyInternalDataChanged(AK::IAkPluginParam::ALL_PLUGIN_DATA_ID, true);
 }
 
 AK::Wwise::Plugin::ConversionResult OKConvolutionPlugin::ConvertFile(
