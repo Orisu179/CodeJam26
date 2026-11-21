@@ -29,18 +29,14 @@ the specific language governing permissions and limitations under the License.
 #include "../OKConvolutionPlugin.h"
 
 class OKConvolutionPluginGUI final
-	: public AK::Wwise::Plugin::PluginMFCWindows<>
-	, public AK::Wwise::Plugin::GUIWindows
+	: public AK::Wwise::Plugin::GUIWindows
 	, public AK::Wwise::Plugin::RequestObjectMedia
 {
 public:
-	OKConvolutionPluginGUI();
-	~OKConvolutionPluginGUI() override;
-	HINSTANCE GetResourceHandle() const override;
+	OKConvolutionPluginGUI() = default;
+	~OKConvolutionPluginGUI() override = default;
 	bool GetDialog(AK::Wwise::Plugin::eDialog in_eDialog, uint32_t& out_uiDialogID,
 		AK::Wwise::Plugin::PopulateTableItem*& out_pTable) const override;
 	bool WindowProc(AK::Wwise::Plugin::eDialog in_eDialog, HWND in_hWnd, uint32_t in_message, WPARAM in_wParam,
 		LPARAM in_lParam, LRESULT& out_lResult) override;
-	bool Help(HWND in_hWnd, AK::Wwise::Plugin::eDialog in_eDialog, const char* in_szLanguageCode) const override;
-	void NotifyPluginMediaChanged() override;
 };

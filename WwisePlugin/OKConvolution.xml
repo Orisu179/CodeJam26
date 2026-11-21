@@ -36,27 +36,26 @@ for the documentation about the plugin xml format
           <CanBeInsertOnBusses>true</CanBeInsertOnBusses>
           <CanBeInsertOnAudioObjects>true</CanBeInsertOnAudioObjects>
           <CanBeRendered>true</CanBeRendered>
+          <CanReferenceDataFile>true</CanReferenceDataFile>
         </Platform>
       </PlatformSupport>
     </PluginInfo>
-    <HasMedia>true</HasMedia>
     <Properties>
-      <!-- Add your property definitions here -->
       <Property Name="ActiveIRIndex" Type="Uint16" SupportRTPCType="Exclusive" DisplayName="Active IR Slot">
-        <UserInterface Step="1" Fine="1" Decimals="0"/>
+        <UserInterface Step="1" Fine="1" Decimals="0" />
         <DefaultValue>0</DefaultValue>
         <AudioEnginePropertyID>0</AudioEnginePropertyID>
         <Restrictions>
           <ValueRestriction>
             <Range Type="Uint16">
-              <Min>0</Min> 
-              <Max>15</Max> <!-- Change up to max needed, default is 16 -->
+              <Min>0</Min>
+              <Max>15</Max>
             </Range>
           </ValueRestriction>
         </Restrictions>
       </Property>
       <Property Name="DryWetMix" Type="Real32" SupportRTPCType="Exclusive" DisplayName="Dry Wet Mix">
-        <UserInterface Step="0.1" Fine="0.001" Decimals="3" UIMax="10" />
+        <UserInterface Step="0.1" Fine="0.001" Decimals="3" UIMax="100" />
         <DefaultValue>100.0</DefaultValue>
         <AudioEnginePropertyID>1</AudioEnginePropertyID>
         <Restrictions>
@@ -68,8 +67,8 @@ for the documentation about the plugin xml format
           </ValueRestriction>
         </Restrictions>
       </Property>
-      <Property Name="CrossFadeTime" Type="Real32" >
-        <UserInterface Step="5" Fine="0.1" Decimals="3" UIMax="10" />
+      <Property Name="CrossFadeTime" Type="Real32" DisplayName="Cross Fade Time">
+        <UserInterface Step="5" Fine="0.1" Decimals="3" UIMax="1000" />
         <DefaultValue>100.0</DefaultValue>
         <AudioEnginePropertyID>2</AudioEnginePropertyID>
         <Restrictions>

@@ -52,16 +52,17 @@ AKRESULT OKConvolutionFXParams::Init(AK::IAkPluginMemAlloc* in_pAllocator, const
 {
     if (in_ulBlockSize == 0)
     {
-        // Initialize default parameters here
+        // Match XML DefaultValue entries
         RTPC.fActiveIR = 0;
-        RTPC.fDryWet = 0.0f;
-        RTPC.fFadeTime = 0.0f;
+        RTPC.fDryWet   = 100.0f;
+        RTPC.fFadeTime = 100.0f;
         m_paramChangeHandler.SetAllParamChanges();
         return AK_Success;
     }
 
     return SetParamsBlock(in_pParamsBlock, in_ulBlockSize);
 }
+
 
 AKRESULT OKConvolutionFXParams::Term(AK::IAkPluginMemAlloc* in_pAllocator)
 {
@@ -74,15 +75,12 @@ AKRESULT OKConvolutionFXParams::SetParamsBlock(const void* in_pParamsBlock, AkUI
     AKRESULT eResult = AK_Success;
     AkUInt8* pParamsBlock = (AkUInt8*)in_pParamsBlock;
 
-    // Read bank data here
     RTPC.fActiveIR = READBANKDATA(AkUInt16, pParamsBlock, in_ulBlockSize);
-    CHECKBANKDATASIZE(in_ulBlockSize, eResult);
-    RTPC.fDryWet = READBANKDATA(AkReal32, pParamsBlock, in_ulBlockSize);
-    CHECKBANKDATASIZE(in_ulBlockSize, eResult);
+    RTPC.fDryWet   = READBANKDATA(AkReal32, pParamsBlock, in_ulBlockSize);
     RTPC.fFadeTime = READBANKDATA(AkReal32, pParamsBlock, in_ulBlockSize);
     CHECKBANKDATASIZE(in_ulBlockSize, eResult);
-    m_paramChangeHandler.SetAllParamChanges();
 
+    m_paramChangeHandler.SetAllParamChanges();
     return eResult;
 }
 
@@ -90,19 +88,23 @@ AKRESULT OKConvolutionFXParams::SetParam(AkPluginParamID in_paramID, const void*
 {
     AKRESULT eResult = AK_Success;
 
-    // Handle parameter change here
     switch (in_paramID)
     {
     case PARAM_ACTIVEIR_ID:
-        RTPC.fActiveIR = *((AkUInt16*)in_pValue);
+        if (in_ulParamSize == sizeof(AkReal32))
+            RTPC.fActiveIR = static_cast<AkUInt16>(*reinterpret_cast<const AkReal32*>(in_pValue));
+        else if (in_ulParamSize == sizeof(AkUInt16))
+            RTPC.fActiveIR = *reinterpret_cast<const AkUInt16*>(in_pValue);
+        else
+            eResult = AK_InvalidParameter;
         m_paramChangeHandler.SetParamChange(PARAM_ACTIVEIR_ID);
         break;
     case PARAM_DRYWET_ID:
-        RTPC.fDryWet = *((AkReal32*)in_pValue);
+        RTPC.fDryWet = *reinterpret_cast<const AkReal32*>(in_pValue);
         m_paramChangeHandler.SetParamChange(PARAM_DRYWET_ID);
         break;
     case PARAM_FADETIME_ID:
-        RTPC.fFadeTime = *((AkReal32*)in_pValue);
+        RTPC.fFadeTime = *reinterpret_cast<const AkReal32*>(in_pValue);
         m_paramChangeHandler.SetParamChange(PARAM_FADETIME_ID);
         break;
     default:

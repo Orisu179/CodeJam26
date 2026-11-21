@@ -26,25 +26,21 @@ the specific language governing permissions and limitations under the License.
 
 #include "OKConvolutionPluginGUI.h"
 #include <commdlg.h> // For GetOpenFileName
-#define IDC_BUTTON_BROWSE_IR 1001
+#include "resource.h"
 
-OKConvolutionPluginGUI::OKConvolutionPluginGUI()
-{
-}
-
-OKConvolutionPluginGUI::~OKConvolutionPluginGUI()
-{
-}
-
-HINSTANCE OKConvolutionPluginGUI::GetResourceHandle() const
-{
-    return GUIWindows::GetResourceHandle();
-}
+AK_WWISE_PLUGIN_GUI_WINDOWS_BEGIN_POPULATE_TABLE(OKConvolutionProp)
+AK_WWISE_PLUGIN_GUI_WINDOWS_END_POPULATE_TABLE()
 
 bool OKConvolutionPluginGUI::GetDialog(AK::Wwise::Plugin::eDialog in_eDialog, uint32_t& out_uiDialogID,
     AK::Wwise::Plugin::PopulateTableItem*& out_pTable) const
 {
-    return true;
+    if (in_eDialog == AK::Wwise::Plugin::SettingsDialog)
+    {
+        out_uiDialogID = IDD_OKCONVOLUTION_BIG;
+        out_pTable = OKConvolutionProp;
+        return true;
+    }
+    return false;
 }
 
 bool OKConvolutionPluginGUI::WindowProc(AK::Wwise::Plugin::eDialog in_eDialog, HWND in_hWnd, uint32_t in_message,
@@ -54,21 +50,17 @@ bool OKConvolutionPluginGUI::WindowProc(AK::Wwise::Plugin::eDialog in_eDialog, H
     {
         wchar_t szFilePath[MAX_PATH] = L"";
 
-        OPENFILENAMEW ofn = { sizeof(ofn) };
-        ofn.hwndOwner = in_hWnd;
+        OPENFILENAMEW ofn = {};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner   = in_hWnd;
         ofn.lpstrFilter = L"WAV Files (*.wav)\0*.wav\0All Files (*.*)\0*.*\0";
-        ofn.lpstrFile = szFilePath;
-        ofn.nMaxFile = MAX_PATH;
-        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+        ofn.lpstrFile   = szFilePath;
+        ofn.nMaxFile    = MAX_PATH;
+        ofn.Flags       = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 
         if (GetOpenFileNameW(&ofn))
         {
-            // Index 0 represents the first media slot for this plugin instance.
-            // If you support multiple IR slots, use the appropriate index (e.g. ActiveIRIndex).
             const unsigned int uMediaIndex = 0;
-
-            // Assign the WAV file as the media source.
-            // Setting in_bUseAsOriginal to true copies or references the file into the project's Originals.
             m_objectMedia.SetMediaSource(szFilePath, uMediaIndex, true);
         }
 
@@ -79,19 +71,8 @@ bool OKConvolutionPluginGUI::WindowProc(AK::Wwise::Plugin::eDialog in_eDialog, H
     return false;
 }
 
-bool OKConvolutionPluginGUI::Help(HWND in_hWnd, AK::Wwise::Plugin::eDialog in_eDialog,
-    const char* in_szLanguageCode) const
-{
-    return GUIWindows::Help(in_hWnd, in_eDialog, in_szLanguageCode);
-}
-
-void OKConvolutionPluginGUI::NotifyPluginMediaChanged()
-{
-    RequestedHostInterface<AK::Wwise::Plugin::ObjectMedia>::NotifyPluginMediaChanged();
-}
-
 AK_ADD_PLUGIN_CLASS_TO_CONTAINER(
-    OKConvolution, // Name of the plug-in container for this shared library
-    OKConvolutionPluginGUI, // Authoring plug-in class to add to the plug-in container
-    OKConvolutionFX // Corresponding Sound Engine plug-in class
+    OKConvolution,
+    OKConvolutionPluginGUI,
+    OKConvolutionFX
 );

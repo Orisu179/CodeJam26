@@ -65,7 +65,8 @@ Plugin.sdk.static.defines = -- https://github.com/premake/premake-core/wiki/defi
 {
     "PFFFT_STATIC_DEFINE",
     "PFFASTCONV_STATIC_DEFINE",
-    "PFDSP_STATIC_DEFINE"
+    "PFDSP_STATIC_DEFINE",
+    "NOMINMAX"
 }
 Plugin.sdk.static.custom = function()
     cppdialect "C++20"
@@ -128,7 +129,8 @@ Plugin.authoring.defines =
 {
     "PFFFT_STATIC_DEFINE",
     "PFFASTCONV_STATIC_DEFINE",
-    "PFDSP_STATIC_DEFINE"
+    "PFDSP_STATIC_DEFINE",
+    "NOMINMAX"
 }
 Plugin.authoring.custom = function()
     cppdialect "C++20"

@@ -26,7 +26,8 @@ the specific language governing permissions and limitations under the License.
 
 #ifndef OKConvolutionFXFactory_H
 #define OKConvolutionFXFactory_H
+#include <AK/SoundEngine/Common/IAkPlugin.h>
 
-AK_STATIC_LINK_PLUGIN(OKConvolutionFX)
+AK_STATIC_LINK_PLUGIN(OKConvolutionFX);
 
 #endif // OKConvolutionFXFactory_H
