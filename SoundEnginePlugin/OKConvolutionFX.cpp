@@ -52,15 +52,38 @@ OKConvolutionFX::~OKConvolutionFX() = default;
 
 AKRESULT OKConvolutionFX::Init(AK::IAkPluginMemAlloc* in_pAllocator, AK::IAkEffectPluginContext* in_pContext, AK::IAkPluginParam* in_pParams, AkAudioFormat& in_rFormat)
 {
-    m_pParams = (OKConvolutionFXParams*)in_pParams;
+    m_pParams    = static_cast<OKConvolutionFXParams*>(in_pParams);
     m_pAllocator = in_pAllocator;
-    m_pContext = in_pContext;
+    m_pContext   = in_pContext;
+
+    m_pEngine = AK_PLUGIN_NEW(in_pAllocator, ConvolutionEngine());
+    if (!m_pEngine)
+        return AK_InsufficientMemory;
+
+    const AkUInt32 uBlockSize   = in_pContext->GlobalContext()->GetMaxBufferLength();
+    const AkUInt32 uNumChannels = in_rFormat.GetNumChannels();
+
+    AKRESULT res = m_pEngine->Init(in_pAllocator, uBlockSize, uNumChannels);
+    if (res != AK_Success)
+        return res;
+
+    AkUInt8* pMediaData = nullptr;
+    AkUInt32 uMediaSize = 0;
+    m_pContext->GetPluginMedia(0, pMediaData, uMediaSize);
+    if (pMediaData && uMediaSize > 0)
+    {
+        res = m_pEngine->SetIR(pMediaData, uMediaSize);
+        if (res != AK_Success)
+            return res;
+    }
 
     return AK_Success;
 }
 
 AKRESULT OKConvolutionFX::Term(AK::IAkPluginMemAlloc* in_pAllocator)
 {
+    m_pEngine->Term(in_pAllocator); 
+    AK_PLUGIN_DELETE(in_pAllocator, m_pEngine);
     AK_PLUGIN_DELETE(in_pAllocator, this);
     return AK_Success;
 }
