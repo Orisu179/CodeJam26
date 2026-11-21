@@ -32,22 +32,24 @@ public:
     ConvolutionEngine() = default;
     ~ConvolutionEngine() = default;
 
-    // in_uBlockSize: partition size B (pass in_pContext->GetMaxBufferLength() for zero extra latency)
+    // in_uBlockSize: partition size B (pass in_pContext->GlobalContext()->GetMaxBufferLength())
     // in_uNumChannels: audio bus/voice channel count (pass in_rFormat.GetNumChannels())
+    // in_uSampleRate: audio bus/voice sample rate (pass in_rFormat.uSampleRate)
     AKRESULT Init(
         AK::IAkPluginMemAlloc* in_pAllocator,
         AkUInt32 in_uBlockSize = 512,
-        AkUInt32 in_uNumChannels = 2);
+        AkUInt32 in_uNumChannels = 2,
+        AkUInt32 in_uSampleRate = 48000);
 
     void Term(AK::IAkPluginMemAlloc* in_pAllocator);
 
-    // Clears internal delay lines and overlap buffers (e.g., when voice/bus restarts)
+    // Clears internal delay lines, overlap buffers, and limiter envelope
     void Reset();
 
     // Parses a single converted IR blob and precomputes its FFT partitions
     AKRESULT SetIR(const AkUInt8* in_pData, AkUInt32 in_uDataSize);
 
-    // Dry/wet gains are ignored for now; outputs 100% wet convolved audio
+    // Convolves audio in-place, blends dry/wet gains with per-block smoothing, and limits output
     void Process(AkAudioBuffer* io_pBuffer, float in_fWetGain, float in_fDryGain);
 
     const IRData& GetIR() const { return m_ir; }
@@ -65,7 +67,12 @@ private:
         ChannelState& io_channel,
         const AkReal32* in_pIrChannelPartitions,
         AkReal32* io_pAudio,
-        AkUInt32 in_uValidFrames);
+        AkUInt32 in_uValidFrames,
+        AkReal32 in_fStartDryGain,
+        AkReal32 in_fDryStep,
+        AkReal32 in_fStartWetGain,
+        AkReal32 in_fWetStep) const;
+
 
     void FreeIRAndPartitions();
     void FreeChannelStates();
@@ -75,6 +82,7 @@ private:
     AkUInt32 m_uBlockSize        = 0; // Partition size B (power of 2, >= 16)
     AkUInt32 m_uFftSize          = 0; // FFT size N = 2 * B (power of 2, >= 32 for PFFFT_REAL)
     AkUInt32 m_uNumAudioChannels = 0;
+    AkUInt32 m_uSampleRate       = 48000;
     AkUInt32 m_uNumPartitions    = 0; // P = ceil(IR_length / B)
 
     PFFFT_Setup* m_pFftSetup = nullptr;
@@ -90,6 +98,11 @@ private:
 
     // Per-audio-channel convolution state
     ChannelState* m_pChannels = nullptr;
+
+    // Dry/wet smoothing state (avoids clicks when automating DryWetMix)
+    AkReal32 m_fPrevDryGain = 0.0f;
+    AkReal32 m_fPrevWetGain = 1.0f;
+    bool     m_bHasPrevGains = false;
 
     IRData m_ir;
 };

@@ -1,10 +1,14 @@
 ﻿#include "ConvolutionEngine.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace
 {
+    constexpr AkReal32 kLimiterCeiling    = 0.95f; // ~ -0.45 dBFS ceiling
+    constexpr AkReal32 kLimiterReleaseSec = 0.05f; // 50 ms smooth gain recovery
+
     // PFFFT requires N >= 32 for PFFFT_REAL; since N = 2 * B, enforce B >= 16 and power-of-2.
     AkUInt32 NextPowerOfTwoMin16(AkUInt32 v)
     {
@@ -43,7 +47,8 @@ namespace
 AKRESULT ConvolutionEngine::Init(
     AK::IAkPluginMemAlloc* in_pAllocator,
     AkUInt32 in_uBlockSize,
-    AkUInt32 in_uNumChannels)
+    AkUInt32 in_uNumChannels,
+    AkUInt32 in_uSampleRate)
 {
     if (!in_pAllocator || in_uNumChannels == 0)
         return AK_InvalidParameter;
@@ -52,6 +57,9 @@ AKRESULT ConvolutionEngine::Init(
     m_uBlockSize        = NextPowerOfTwoMin16(in_uBlockSize);
     m_uFftSize          = m_uBlockSize * 2u; // 2x block size avoids circular convolution aliasing
     m_uNumAudioChannels = in_uNumChannels;
+    m_uSampleRate       = (in_uSampleRate > 0) ? in_uSampleRate : 48000u;
+
+    m_bHasPrevGains        = false;
 
     // 1. Initialize PFFFT plan for real-valued FFT of length N = 2B
     m_pFftSetup = pffft_new_setup(static_cast<int>(m_uFftSize), PFFFT_REAL);
@@ -113,11 +121,14 @@ void ConvolutionEngine::Term(AK::IAkPluginMemAlloc* in_pAllocator)
     m_uBlockSize        = 0;
     m_uFftSize          = 0;
     m_uNumAudioChannels = 0;
+    m_bHasPrevGains     = false;
     m_pAllocator        = nullptr;
 }
 
 void ConvolutionEngine::Reset()
 {
+    m_bHasPrevGains = false;
+
     if (!m_pChannels)
         return;
 
@@ -217,8 +228,8 @@ AKRESULT ConvolutionEngine::BuildPartitions()
 
         for (AkUInt32 p = 0; p < m_uNumPartitions; ++p)
         {
-            const AkUInt32 startFrame  = p * m_uBlockSize;
-            const AkUInt32 copyFrames  = (std::min)(m_uBlockSize, m_ir.uNumFrames - startFrame);
+            const AkUInt32 startFrame = p * m_uBlockSize;
+            const AkUInt32 copyFrames = (std::min)(m_uBlockSize, m_ir.uNumFrames - startFrame);
 
             // Place this partition's B samples in the first half; zero-pad the second half (B .. 2B-1)
             std::memset(m_pTimeBuf, 0, m_uFftSize * sizeof(AkReal32));
@@ -245,17 +256,30 @@ AKRESULT ConvolutionEngine::BuildPartitions()
     return AK_Success;
 }
 
-void ConvolutionEngine::Process(AkAudioBuffer* io_pBuffer, float /*in_fWetGain*/, float /*in_fDryGain*/)
+void ConvolutionEngine::Process(AkAudioBuffer* io_pBuffer, float in_fWetGain, float in_fDryGain)
 {
     if (!io_pBuffer || io_pBuffer->uValidFrames == 0)
         return;
 
-    // If no IR is loaded yet, leave the buffer untouched (bypass)
+    // If no IR is loaded yet, leave the buffer untouched (transparent bypass)
     if (!m_pIrPartitions || m_uNumPartitions == 0 || !m_pChannels)
         return;
 
-    const AkUInt32 uChannelsToProcess = std::min(io_pBuffer->NumChannels(), m_uNumAudioChannels);
+    const AkUInt32 uChannelsToProcess = (std::min)(io_pBuffer->NumChannels(), m_uNumAudioChannels);
     const AkUInt32 uTotalFrames       = io_pBuffer->uValidFrames;
+
+    // Snap gains on the very first block after Init()/Reset() so playback doesn't fade in
+    if (!m_bHasPrevGains)
+    {
+        m_fPrevDryGain  = in_fDryGain;
+        m_fPrevWetGain  = in_fWetGain;
+        m_bHasPrevGains = true;
+    }
+
+    // Per-sample linear ramp increments shared across all channels for this buffer
+    const AkReal32 fInvFrames = 1.0f / static_cast<AkReal32>(uTotalFrames);
+    const AkReal32 fDryStep   = (in_fDryGain - m_fPrevDryGain) * fInvFrames;
+    const AkReal32 fWetStep   = (in_fWetGain - m_fPrevWetGain) * fInvFrames;
 
     for (AkUInt32 ch = 0; ch < uChannelsToProcess; ++ch)
     {
@@ -273,40 +297,50 @@ void ConvolutionEngine::Process(AkAudioBuffer* io_pBuffer, float /*in_fWetGain*/
         AkUInt32 framesDone = 0;
         while (framesDone < uTotalFrames)
         {
-            const AkUInt32 chunkFrames = std::min(m_uBlockSize, uTotalFrames - framesDone);
+            const AkUInt32 chunkFrames = (std::min)(m_uBlockSize, uTotalFrames - framesDone);
+
+            const AkReal32 fChunkDryStart = m_fPrevDryGain + fDryStep * static_cast<AkReal32>(framesDone);
+            const AkReal32 fChunkWetStart = m_fPrevWetGain + fWetStep * static_cast<AkReal32>(framesDone);
 
             ProcessChannelBlock(
                 m_pChannels[ch],
                 pIrChannelPartitions,
                 pAudio + framesDone,
-                chunkFrames);
+                chunkFrames,
+                fChunkDryStart,
+                fDryStep,
+                fChunkWetStart,
+                fWetStep);
 
             framesDone += chunkFrames;
         }
     }
+
+    // Store target gains for the next block's ramp start
+    m_fPrevDryGain = in_fDryGain;
+    m_fPrevWetGain = in_fWetGain;
 }
 
 void ConvolutionEngine::ProcessChannelBlock(
     ChannelState& io_channel,
     const AkReal32* in_pIrChannelPartitions,
     AkReal32* io_pAudio,
-    AkUInt32 in_uValidFrames)
+    AkUInt32 in_uValidFrames,
+    AkReal32 in_fStartDryGain,
+    AkReal32 in_fDryStep,
+    AkReal32 in_fStartWetGain,
+    AkReal32 in_fWetStep) const
 {
-    // -------------------------------------------------------------------------
     // STEP 1: Zero-pad the incoming block of B samples to length N = 2B
-    // -------------------------------------------------------------------------
     std::memset(m_pTimeBuf, 0, m_uFftSize * sizeof(AkReal32));
     std::memcpy(m_pTimeBuf, io_pAudio, in_uValidFrames * sizeof(AkReal32));
 
-    // -------------------------------------------------------------------------
     // STEP 2: Forward FFT into the current slot of the circular FDL
-    // -------------------------------------------------------------------------
     AkReal32* pCurrentInputFft =
         io_channel.pFdl + static_cast<size_t>(io_channel.uFdlHead) * m_uFftSize;
 
     pffft_transform_ordered(m_pFftSetup, m_pTimeBuf, pCurrentInputFft, m_pWorkBuf, PFFFT_FORWARD);
 
-    // -------------------------------------------------------------------------
     // STEP 3: Complex Multiply-Accumulate (CMAC) across all P partitions
     //
     // Output spectrum Y = sum_{p=0}^{P-1} X[head - p] * H[p]
@@ -344,23 +378,23 @@ void ConvolutionEngine::ProcessChannelBlock(
         }
     }
 
-    // -------------------------------------------------------------------------
     // STEP 4: Inverse FFT back to the time domain (length N = 2B)
-    // -------------------------------------------------------------------------
     pffft_transform_ordered(m_pFftSetup, m_pAccumFft, m_pTimeBuf, m_pWorkBuf, PFFFT_BACKWARD);
 
-    // -------------------------------------------------------------------------
-    // STEP 5: Normalize (1/N) and apply Overlap-Add
-    //
-    // PFFFT is unscaled: IFFT(FFT(x)) = N * x.
-    //   - First B samples  + previous overlap -> current audio output
-    //   - Second B samples                    -> saved as next block's overlap
-    // -------------------------------------------------------------------------
+    // STEP 5: Normalize (1/N), apply Overlap-Add, and blend smoothed Dry/Wet mix in-place
     const AkReal32 invN = 1.0f / static_cast<AkReal32>(m_uFftSize);
+    AkReal32 fDryGain   = in_fStartDryGain;
+    AkReal32 fWetGain   = in_fStartWetGain;
 
     for (AkUInt32 i = 0; i < in_uValidFrames; ++i)
     {
-        io_pAudio[i] = m_pTimeBuf[i] * invN + io_channel.pOverlap[i];
+        const AkReal32 fDrySample = io_pAudio[i];
+        const AkReal32 fWetSample = m_pTimeBuf[i] * invN + io_channel.pOverlap[i];
+
+        io_pAudio[i] = fDrySample * fDryGain + fWetSample * fWetGain;
+
+        fDryGain += in_fDryStep;
+        fWetGain += in_fWetStep;
     }
 
     for (AkUInt32 i = 0; i < m_uBlockSize; ++i)
@@ -368,9 +402,7 @@ void ConvolutionEngine::ProcessChannelBlock(
         io_channel.pOverlap[i] = m_pTimeBuf[m_uBlockSize + i] * invN;
     }
 
-    // -------------------------------------------------------------------------
     // STEP 6: Advance FDL ring-buffer head for the next block
-    // -------------------------------------------------------------------------
     io_channel.uFdlHead = (io_channel.uFdlHead + 1u) % m_uNumPartitions;
 }
 

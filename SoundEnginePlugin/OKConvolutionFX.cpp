@@ -25,6 +25,7 @@ the specific language governing permissions and limitations under the License.
 *******************************************************************************/
 
 #include "OKConvolutionFX.h"
+#include <algorithm>
 #include "../OKConvolutionConfig.h"
 
 #include <AK/AkWwiseSDKVersion.h>
@@ -105,8 +106,12 @@ AKRESULT OKConvolutionFX::Init(
 
     const AkUInt32 uBlockSize   = in_pContext->GlobalContext()->GetMaxBufferLength();
     const AkUInt32 uNumChannels = in_rFormat.GetNumChannels();
+    const AkUInt32 uSampleRate  = in_rFormat.uSampleRate;
 
-    AKRESULT res = m_pEngine->Init(in_pAllocator, uBlockSize, uNumChannels);
+    AKRESULT res = m_pEngine->Init(in_pAllocator, uBlockSize, uNumChannels, uSampleRate);
+    if (res != AK_Success)
+        return res;
+
     if (res != AK_Success)
         return res;
 
@@ -145,14 +150,16 @@ AKRESULT OKConvolutionFX::GetPluginInfo(AkPluginInfo& out_rPluginInfo)
 
 void OKConvolutionFX::Execute(AkAudioBuffer* io_pBuffer)
 {
-    if (!m_pEngine)
+    if (!m_pEngine || !m_pParams)
         return;
 
     // Detect if Wwise Authoring swapped the media slot while the bus stays active
     UpdateIRFromMedia(0);
+    const AkReal32 fMix     = std::clamp(m_pParams->RTPC.fDryWet * 0.01f, 0.0f, 1.0f);
+    const AkReal32 fWetGain = fMix;
+    const AkReal32 fDryGain = 1.0f - fMix;
 
-    // Dry/wet gains are currently ignored inside ConvolutionEngine::Process()
-    m_pEngine->Process(io_pBuffer, 1.0f, 0.0f);
+    m_pEngine->Process(io_pBuffer, fWetGain, fDryGain);
 }
 
 AKRESULT OKConvolutionFX::TimeSkip(AkUInt32 in_uFrames)

@@ -29,6 +29,7 @@ the specific language governing permissions and limitations under the License.
 
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -334,6 +335,150 @@ namespace
         }
         return in_hash;
     }
+    
+    constexpr uint32_t kIRNormalizationVersion = 1u;
+
+    size_t NextPowerOfTwo(size_t in_value)
+    {
+        size_t p = 1;
+        while (p < in_value)
+        {
+            p <<= 1;
+        }
+        return p;
+    }
+
+    // In-place Radix-2 Cooley-Tukey forward FFT (unnormalized: |H[k]| equals linear steady-state gain at bin k)
+    void ComputeForwardFFT(
+        std::vector<std::complex<double>>& io_data,
+        const std::vector<std::complex<double>>& in_twiddles)
+    {
+        const size_t n = io_data.size();
+
+        // Bit-reversal permutation
+        for (size_t i = 1, j = 0; i < n; ++i)
+        {
+            size_t bit = n >> 1;
+            for (; j & bit; bit >>= 1)
+            {
+                j ^= bit;
+            }
+            j ^= bit;
+            if (i < j)
+            {
+                std::swap(io_data[i], io_data[j]);
+            }
+        }
+
+        // Butterfly stages
+        for (size_t len = 2; len <= n; len <<= 1)
+        {
+            const size_t halfLen = len >> 1;
+            const size_t twiddleStep = n / len;
+
+            for (size_t i = 0; i < n; i += len)
+            {
+                for (size_t j = 0; j < halfLen; ++j)
+                {
+                    const std::complex<double> u = io_data[i + j];
+                    const std::complex<double> v = io_data[i + j + halfLen] * in_twiddles[j * twiddleStep];
+                    io_data[i + j]           = u + v;
+                    io_data[i + j + halfLen] = u - v;
+                }
+            }
+        }
+    }
+
+    // Equalizes perceived broadband loudness across short and long IRs via L2 energy normalization,
+    // while clamping total gain if any narrow room mode exceeds the spectral peak ceiling.
+    void NormalizeIRWithSpectralGuard(DecodedWav& io_wav)
+    {
+        if (io_wav.numChannels == 0 || io_wav.numFrames == 0 || io_wav.planarSamples.empty())
+            return;
+
+        // Tuning parameters:
+        // - kTargetBroadbandGain = 1.0 (0 dB): unity RMS gain for uncorrelated broadband signals (and exact unity for a Dirac delta).
+        // - kMaxSpectralPeakDb = 12.0 (+12 dB): allows normal diffuse statistical FFT peaks (~9-10.5 dB)
+        //   to remain purely energy-normalized while pulling down narrow resonant room modes.
+        constexpr double kTargetBroadbandGain = 1.0;
+        constexpr double kMaxSpectralPeakDb   = 12.0;
+        constexpr double kMinEnergyFloor      = 1e-12;
+        constexpr double kTwoPi               = 6.283185307179586476925286766559;
+
+        const double maxSpectralCeiling = std::pow(10.0, kMaxSpectralPeakDb / 20.0);
+
+        // 1. Compute average per-channel L2 energy (and sanitize any non-finite float samples)
+        double totalEnergy = 0.0;
+        for (float& s : io_wav.planarSamples)
+        {
+            if (!std::isfinite(s))
+            {
+                s = 0.0f;
+                continue;
+            }
+            const double d = static_cast<double>(s);
+            totalEnergy += d * d;
+        }
+
+        const double avgChannelEnergy = totalEnergy / static_cast<double>(io_wav.numChannels);
+        if (avgChannelEnergy <= kMinEnergyFloor)
+            return; // Avoid amplifying digital silence
+
+        const double energyGain = kTargetBroadbandGain / std::sqrt(avgChannelEnergy);
+
+        // 2. Compute worst-case spectral magnitude across all channels and frequency bins.
+        //    2x zero-padding for short/medium IRs reduces inter-bin scalloping loss on narrow resonances.
+        constexpr size_t kMinFftSize = 4096;
+        constexpr size_t kOversampleThresholdFrames = 262144; // ~5.4s @ 48 kHz
+        const size_t minRequired = (io_wav.numFrames <= kOversampleThresholdFrames)
+            ? (static_cast<size_t>(io_wav.numFrames) * 2u)
+            : static_cast<size_t>(io_wav.numFrames);
+        const size_t fftSize = (std::max)(kMinFftSize, NextPowerOfTwo(minRequired));
+
+        std::vector<std::complex<double>> twiddles(fftSize / 2);
+        for (size_t m = 0; m < fftSize / 2; ++m)
+        {
+            const double angle = -kTwoPi * static_cast<double>(m) / static_cast<double>(fftSize);
+            twiddles[m] = std::complex<double>(std::cos(angle), std::sin(angle));
+        }
+
+        std::vector<std::complex<double>> fftBuf(fftSize);
+        double maxSpectralMagSq = 0.0;
+
+        for (uint32_t ch = 0; ch < io_wav.numChannels; ++ch)
+        {
+            const float* srcCh = io_wav.planarSamples.data() + static_cast<size_t>(ch) * io_wav.numFrames;
+
+            for (uint32_t i = 0; i < io_wav.numFrames; ++i)
+            {
+                fftBuf[i] = std::complex<double>(static_cast<double>(srcCh[i]), 0.0);
+            }
+            std::fill(fftBuf.begin() + io_wav.numFrames, fftBuf.end(), std::complex<double>(0.0, 0.0));
+
+            ComputeForwardFFT(fftBuf, twiddles);
+
+            // Real input has Hermitian symmetry, so bins [0 .. fftSize/2] cover the entire spectrum
+            for (size_t k = 0; k <= fftSize / 2; ++k)
+            {
+                maxSpectralMagSq = (std::max)(maxSpectralMagSq, std::norm(fftBuf[k]));
+            }
+        }
+
+        // 3. Combine both targets conservatively using a single scalar gain across all channels
+        double finalGain = energyGain;
+        if (maxSpectralMagSq > kMinEnergyFloor)
+        {
+            const double maxSpectralMag = std::sqrt(maxSpectralMagSq);
+            const double spectralGuardGain = maxSpectralCeiling / maxSpectralMag;
+            finalGain = (std::min)(energyGain, spectralGuardGain);
+        }
+
+        const float gain = static_cast<float>(finalGain);
+        for (float& s : io_wav.planarSamples)
+        {
+            s *= gain;
+        }
+    }
 }
 
 OKConvolutionPlugin::OKConvolutionPlugin()
@@ -395,6 +540,9 @@ AK::Wwise::Plugin::ConversionResult OKConvolutionPlugin::ConvertFile(
 
     // If Wwise specifies a target sample rate for the platform, resample to match it
     ResampleLinearIfNeeded(wav, in_uSampleRate);
+    
+    // Normalize IR energy across short/long IRs while guarding against narrow modal peaks
+    NormalizeIRWithSpectralGuard(wav);
 
     OKIRMediaHeader header{};
     header.magic       = kOKIRMediaMagic;
@@ -432,6 +580,7 @@ uint32_t OKConvolutionPlugin::GetCurrentConversionSettingsHash(
 {
     uint32_t hash = 2166136261u; // FNV-1a offset basis
     hash = HashFNV1a(hash, kOKIRMediaVersion);
+    hash = HashFNV1a(hash, kIRNormalizationVersion);
     hash = HashFNV1a(hash, in_uSampleRate);
     hash = HashFNV1a(hash, in_uBlockLength);
     return hash;
