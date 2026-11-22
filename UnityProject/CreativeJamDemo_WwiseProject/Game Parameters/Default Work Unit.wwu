@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{51B2561A-D81E-491B-A722-9D3038156FD5}" SchemaVersion="133">
+	<GameParameters>
+		<WorkUnit Name="Default Work Unit" ID="{51B2561A-D81E-491B-A722-9D3038156FD5}" PersistMode="Standalone">
+			<ChildrenList>
+				<GameParameter Name="DryWet" ID="{B6147633-E4DA-49F5-AF22-C9BFBE127682}"/>
+			</ChildrenList>
+		</WorkUnit>
+	</GameParameters>
+</WwiseDocument>

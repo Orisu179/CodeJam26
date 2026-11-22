@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{11ACF774-2A49-480D-81CB-9CE30625B201}" SchemaVersion="133">
+	<Events>
+		<WorkUnit Name="Default Work Unit" ID="{11ACF774-2A49-480D-81CB-9CE30625B201}" PersistMode="Standalone">
+			<ChildrenList>
+				<Event Name="PlayWalk" ID="{54DD87D4-5458-4705-AE37-39D35DE97CC0}">
+					<ChildrenList>
+						<Action Name="" ID="{D01F50C2-6340-4990-B492-A0DEB9BFC5AB}" ShortID="723957870">
+							<ReferenceList>
+								<Reference Name="Target">
+									<ObjectRef Name="Walk1" ID="{9567CBDF-BBF1-4B76-A4A1-3D3E27473DED}" WorkUnitID="{EC6C8440-F6BF-41DE-BA41-918D13C4AAB9}"/>
+								</Reference>
+							</ReferenceList>
+						</Action>
+					</ChildrenList>
+				</Event>
+				<Event Name="StopWalk" ID="{B46187D4-62F5-4B38-8414-943D19AC6615}">
+					<ChildrenList>
+						<Action Name="" ID="{EF55264C-D216-4157-8B61-4B8630F6E12B}" ShortID="585020740">
+							<PropertyList>
+								<Property Name="ActionType" Type="int16" Value="2"/>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Target">
+									<ObjectRef Name="Walk1" ID="{9567CBDF-BBF1-4B76-A4A1-3D3E27473DED}" WorkUnitID="{EC6C8440-F6BF-41DE-BA41-918D13C4AAB9}"/>
+								</Reference>
+							</ReferenceList>
+						</Action>
+					</ChildrenList>
+				</Event>
+				<Event Name="PlayMusic" ID="{36232164-BF33-40C2-A61E-DAE2C4453B5D}">
+					<ChildrenList>
+						<Action Name="" ID="{1E8269D0-E02C-4164-A686-73A8912DA502}" ShortID="629616154">
+							<ReferenceList>
+								<Reference Name="Target">
+									<ObjectRef Name="MusicBossWithTail" ID="{F23F403B-34EB-4D2D-8E2B-A89A18D3AAD7}" WorkUnitID="{EC6C8440-F6BF-41DE-BA41-918D13C4AAB9}"/>
+								</Reference>
+							</ReferenceList>
+						</Action>
+					</ChildrenList>
+				</Event>
+				<Event Name="StopMusic" ID="{35393D2F-50F8-43BE-8EAD-DCC7FD4177DC}">
+					<ChildrenList>
+						<Action Name="" ID="{056541C9-E04C-43C1-8CD9-75AB6AB40B5F}" ShortID="582565154">
+							<PropertyList>
+								<Property Name="ActionType" Type="int16" Value="2"/>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Target">
+									<ObjectRef Name="MusicBossWithTail" ID="{F23F403B-34EB-4D2D-8E2B-A89A18D3AAD7}" WorkUnitID="{EC6C8440-F6BF-41DE-BA41-918D13C4AAB9}"/>
+								</Reference>
+							</ReferenceList>
+						</Action>
+					</ChildrenList>
+				</Event>
+			</ChildrenList>
+		</WorkUnit>
+	</Events>
+</WwiseDocument>

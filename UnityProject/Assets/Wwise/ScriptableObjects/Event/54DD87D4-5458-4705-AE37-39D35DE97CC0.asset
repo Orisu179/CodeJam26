@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4514eada171bf8a46b492e5ef1639ad4, type: 3}
+  m_Name: 54DD87D4-5458-4705-AE37-39D35DE97CC0
+  m_EditorClassIdentifier: AK.Wwise.Unity.API.WwiseTypes::WwiseEventReference
+  objectName: PlayWalk
+  id: 2097335752
+  guid: 54DD87D4-5458-4705-AE37-39D35DE97CC0
+  IsInUserDefinedSoundBank: 0

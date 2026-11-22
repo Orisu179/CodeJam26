@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{0459A294-A12A-4727-9E34-3F3014E0BB15}" SchemaVersion="133">
+	<Effects>
+		<WorkUnit Name="Default Work Unit" ID="{0459A294-A12A-4727-9E34-3F3014E0BB15}" PersistMode="Standalone">
+			<ChildrenList>
+				<Effect Name="Bottle" ID="{0A224C98-5FCD-4FAA-9DCD-60C8DE1C4181}" PluginName="OKConvolution" CompanyID="64" PluginID="19719" PluginType="3">
+					<ChildrenList>
+						<PluginMediaSource Name="Bottle Hall" ID="{3EEE8DBE-6C78-4F8B-868E-2E44F31F1788}">
+							<ParentPluginID>1292305411</ParentPluginID>
+							<PropertyList>
+								<Property Name="DataFileName" Type="string" Value="Bottle Hall.wav"/>
+							</PropertyList>
+							<MediaIDList>
+								<MediaID ID="365122565"/>
+							</MediaIDList>
+						</PluginMediaSource>
+					</ChildrenList>
+					<ObjectLists>
+						<ObjectList Name="RTPC">
+							<RTPC Name="" ID="{EA609FA6-D58C-4843-B43D-8FCE29AC507B}" ShortID="542896459">
+								<PropertyList>
+									<Property Name="PropertyName" Type="string" Value="DryWetMix"/>
+								</PropertyList>
+								<ReferenceList>
+									<Reference Name="ControlInput">
+										<ObjectRef Name="DryWet" ID="{B6147633-E4DA-49F5-AF22-C9BFBE127682}" WorkUnitID="{51B2561A-D81E-491B-A722-9D3038156FD5}"/>
+									</Reference>
+									<Reference Name="Curve">
+										<Custom>
+											<Curve Name="" ID="{E40AB1ED-1A7E-43A7-8268-AD5682AFFF9E}">
+												<PropertyList>
+													<Property Name="Flags" Type="int32" Value="1"/>
+												</PropertyList>
+												<PointList>
+													<Point>
+														<XPos>0</XPos>
+														<YPos>0.001</YPos>
+														<Flags>5</Flags>
+													</Point>
+													<Point>
+														<XPos>100</XPos>
+														<YPos>100</YPos>
+														<Flags>37</Flags>
+													</Point>
+												</PointList>
+											</Curve>
+										</Custom>
+									</Reference>
+								</ReferenceList>
+							</RTPC>
+						</ObjectList>
+					</ObjectLists>
+				</Effect>
+				<Effect Name="LargeHall" ID="{94115E1D-A5CC-4A07-A9DD-1139C9E7703B}" PluginName="OKConvolution" CompanyID="64" PluginID="19719" PluginType="3">
+					<ChildrenList>
+						<PluginMediaSource Name="Greek 7 Echo Hall" ID="{75AB8A42-AA79-43B3-B014-54D324C63E0F}">
+							<ParentPluginID>1292305411</ParentPluginID>
+							<PropertyList>
+								<Property Name="DataFileName" Type="string" Value="Greek 7 Echo Hall.wav"/>
+							</PropertyList>
+							<MediaIDList>
+								<MediaID ID="972452919"/>
+							</MediaIDList>
+						</PluginMediaSource>
+					</ChildrenList>
+					<ObjectLists>
+						<ObjectList Name="RTPC">
+							<RTPC Name="" ID="{78365F35-1843-4E62-B13F-596CA73989B7}" ShortID="354009894">
+								<PropertyList>
+									<Property Name="PropertyName" Type="string" Value="DryWetMix"/>
+								</PropertyList>
+								<ReferenceList>
+									<Reference Name="ControlInput">
+										<ObjectRef Name="DryWet" ID="{B6147633-E4DA-49F5-AF22-C9BFBE127682}" WorkUnitID="{51B2561A-D81E-491B-A722-9D3038156FD5}"/>
+									</Reference>
+									<Reference Name="Curve">
+										<Custom>
+											<Curve Name="" ID="{D116A1CE-1DE4-4BBB-96DF-DF5F7E5664E5}">
+												<PropertyList>
+													<Property Name="Flags" Type="int32" Value="1"/>
+												</PropertyList>
+												<PointList>
+													<Point>
+														<XPos>0</XPos>
+														<YPos>0.001</YPos>
+														<Flags>5</Flags>
+													</Point>
+													<Point>
+														<XPos>100</XPos>
+														<YPos>100</YPos>
+														<Flags>37</Flags>
+													</Point>
+												</PointList>
+											</Curve>
+										</Custom>
+									</Reference>
+								</ReferenceList>
+							</RTPC>
+						</ObjectList>
+					</ObjectLists>
+				</Effect>
+			</ChildrenList>
+		</WorkUnit>
+	</Effects>
+</WwiseDocument>
