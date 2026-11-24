@@ -27,9 +27,46 @@ the specific language governing permissions and limitations under the License.
 #include "../SoundEnginePlugin/OKConvolutionFXParams.h"
 
 #include <catch_amalgamated.hpp>
+#include <cstring>
 
-TEST_CASE("OKConvolutionFXParamsTestPlaceholder")
+TEST_CASE("OKConvolutionFXParams default init matches XML defaults")
 {
     OKConvolutionFXParams fxParams;
-    REQUIRE(true);
+    REQUIRE(fxParams.Init(nullptr, nullptr, 0) == AK_Success);
+    REQUIRE(fxParams.RTPC.fActiveIR == 0);
+    REQUIRE(fxParams.RTPC.fDryWet == Catch::Approx(100.0f));
+    REQUIRE(fxParams.RTPC.fFadeTime == Catch::Approx(100.0f));
+}
+
+TEST_CASE("OKConvolutionFXParams SetParamsBlock parses 10-byte bank layout")
+{
+    // Matches GetBankParameters(): WriteUInt16(ActiveIRIndex), WriteReal32(DryWetMix), WriteReal32(CrossFadeTime)
+    AkUInt8 bankData[sizeof(AkUInt16) + sizeof(AkReal32) + sizeof(AkReal32)] = {};
+    const AkUInt16 expectedSlot = 2;
+    const AkReal32 expectedDryWet = 42.5f;
+    const AkReal32 expectedFadeTime = 250.0f;
+
+    std::memcpy(bankData, &expectedSlot, sizeof(expectedSlot));
+    std::memcpy(bankData + sizeof(AkUInt16), &expectedDryWet, sizeof(expectedDryWet));
+    std::memcpy(bankData + sizeof(AkUInt16) + sizeof(AkReal32), &expectedFadeTime, sizeof(expectedFadeTime));
+
+    OKConvolutionFXParams fxParams;
+    REQUIRE(fxParams.SetParamsBlock(bankData, static_cast<AkUInt32>(sizeof(bankData))) == AK_Success);
+    REQUIRE(fxParams.RTPC.fActiveIR == expectedSlot);
+    REQUIRE(fxParams.RTPC.fDryWet == Catch::Approx(expectedDryWet));
+    REQUIRE(fxParams.RTPC.fFadeTime == Catch::Approx(expectedFadeTime));
+}
+
+TEST_CASE("OKConvolutionFXParams SetParam updates ActiveIRIndex from both AkUInt16 and AkReal32 RTPC")
+{
+    OKConvolutionFXParams fxParams;
+    REQUIRE(fxParams.Init(nullptr, nullptr, 0) == AK_Success);
+
+    const AkUInt16 slotU16 = 1;
+    REQUIRE(fxParams.SetParam(PARAM_ACTIVEIR_ID, &slotU16, sizeof(slotU16)) == AK_Success);
+    REQUIRE(fxParams.RTPC.fActiveIR == 1);
+
+    const AkReal32 slotF32 = 3.0f;
+    REQUIRE(fxParams.SetParam(PARAM_ACTIVEIR_ID, &slotF32, sizeof(slotF32)) == AK_Success);
+    REQUIRE(fxParams.RTPC.fActiveIR == 3);
 }

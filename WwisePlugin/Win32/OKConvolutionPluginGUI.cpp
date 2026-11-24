@@ -25,6 +25,8 @@ the specific language governing permissions and limitations under the License.
 *******************************************************************************/
 
 #include "OKConvolutionPluginGUI.h"
+#include "../../OKConvolutionConfig.h"
+#include <algorithm>
 #include <commdlg.h> // For GetOpenFileName
 #include "resource.h"
 
@@ -60,7 +62,10 @@ bool OKConvolutionPluginGUI::WindowProc(AK::Wwise::Plugin::eDialog in_eDialog, H
 
         if (GetOpenFileNameW(&ofn))
         {
-            const unsigned int uMediaIndex = 0;
+            const GUID currentPlatform = m_host.GetCurrentPlatform();
+            const unsigned int uActiveSlot = static_cast<unsigned int>(
+                m_propertySet.GetUInt16(currentPlatform, "ActiveIRIndex"));
+            const unsigned int uMediaIndex = (std::min)(uActiveSlot, OKConvolutionConfig::MaxIRSlots - 1u);
             m_objectMedia.SetMediaSource(szFilePath, uMediaIndex, true);
         }
 

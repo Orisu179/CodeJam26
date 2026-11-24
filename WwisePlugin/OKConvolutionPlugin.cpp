@@ -492,7 +492,7 @@ OKConvolutionPlugin::~OKConvolutionPlugin()
 bool OKConvolutionPlugin::GetBankParameters(const GUID& in_guidPlatform, AK::Wwise::Plugin::DataWriter& in_dataWriter) const
 {
     // Write bank data here
-    in_dataWriter.WriteInt32(m_propertySet.GetUInt16(in_guidPlatform, "ActiveIRIndex"));
+    in_dataWriter.WriteUInt16(m_propertySet.GetUInt16(in_guidPlatform, "ActiveIRIndex"));
     in_dataWriter.WriteReal32(m_propertySet.GetReal32(in_guidPlatform, "DryWetMix"));
     in_dataWriter.WriteReal32(m_propertySet.GetReal32(in_guidPlatform, "CrossFadeTime"));
 

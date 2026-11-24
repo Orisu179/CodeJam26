@@ -29,6 +29,7 @@ the specific language governing permissions and limitations under the License.
 
 #include "ConvolutionEngine.h"
 #include "OKConvolutionFXParams.h"
+#include "../OKConvolutionConfig.h"
 
 class OKConvolutionFX
     : public AK::IAkInPlaceEffectPlugin
@@ -47,16 +48,23 @@ public:
   AKRESULT RelocateMedia(AkUInt8* in_pNewMedia, AkUInt8* in_pOldMedia) override;
 
 private:
-  AKRESULT UpdateIRFromMedia(AkUInt32 in_uMediaIndex);
+  struct MediaSlotCache
+  {
+    const AkUInt8* pData = nullptr;
+    AkUInt32 uSize = 0;
+    AkUInt32 uSignature = 0;
+  };
+
+  bool RefreshMediaSlotCache(AkUInt32 in_uMediaIndex);
+  AKRESULT UpdateIRFromMedia(AkUInt32 in_uMediaIndex, bool in_bForceReload = false);
 
   OKConvolutionFXParams* m_pParams;
   AK::IAkPluginMemAlloc* m_pAllocator;
   AK::IAkEffectPluginContext* m_pContext;
   ConvolutionEngine* m_pEngine;
 
-  const AkUInt8* m_pLastMediaData;
-  AkUInt32 m_uLastMediaSize;
-  AkUInt32 m_uLastMediaSignature;
+  MediaSlotCache m_mediaCache[OKConvolutionConfig::MaxIRSlots];
+  AkUInt32 m_uActiveIRSlot;
 };
 
 #endif // OKConvolutionFX_H

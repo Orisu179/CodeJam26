@@ -35,6 +35,7 @@ namespace OKConvolutionConfig
 {
     static const unsigned short CompanyID = 64;
     static const unsigned short PluginID = 19719;
+    static constexpr unsigned int MaxIRSlots = 4u;
 }
 
 #endif // OKConvolutionConfig_H

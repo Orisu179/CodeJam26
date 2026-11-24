@@ -31,6 +31,8 @@ the specific language governing permissions and limitations under the License.
 class OKConvolutionPluginGUI final
 	: public AK::Wwise::Plugin::GUIWindows
 	, public AK::Wwise::Plugin::RequestObjectMedia
+	, public AK::Wwise::Plugin::RequestPropertySet
+	, public AK::Wwise::Plugin::RequestHost
 {
 public:
 	OKConvolutionPluginGUI() = default;

@@ -82,9 +82,8 @@ OKConvolutionFX::OKConvolutionFX()
     , m_pAllocator(nullptr)
     , m_pContext(nullptr)
     , m_pEngine(nullptr)
-    , m_pLastMediaData(nullptr)
-    , m_uLastMediaSize(0)
-    , m_uLastMediaSignature(0)
+    , m_mediaCache{}
+    , m_uActiveIRSlot(0)
 {
 }
 
@@ -112,10 +111,17 @@ AKRESULT OKConvolutionFX::Init(
     if (res != AK_Success)
         return res;
 
-    if (res != AK_Success)
-        return res;
+    // Cache all populated media slots up front (ready for Phase 1/2 pre-partitioning via SetIRSlot)
+    for (AkUInt32 slot = 0; slot < OKConvolutionConfig::MaxIRSlots; ++slot)
+    {
+        RefreshMediaSlotCache(slot);
+    }
 
-    return UpdateIRFromMedia(0);
+    const AkUInt32 uRequestedSlot = m_pParams ? static_cast<AkUInt32>(m_pParams->RTPC.fActiveIR) : 0u;
+    m_uActiveIRSlot = (std::min)(uRequestedSlot, OKConvolutionConfig::MaxIRSlots - 1u);
+
+    const MediaSlotCache& activeMedia = m_mediaCache[m_uActiveIRSlot];
+    return m_pEngine->SetIR(activeMedia.pData, activeMedia.uSize);
 }
 
 AKRESULT OKConvolutionFX::Term(AK::IAkPluginMemAlloc* in_pAllocator)
@@ -153,8 +159,16 @@ void OKConvolutionFX::Execute(AkAudioBuffer* io_pBuffer)
     if (!m_pEngine || !m_pParams)
         return;
 
-    // Detect if Wwise Authoring swapped the media slot while the bus stays active
-    UpdateIRFromMedia(0);
+    const AkUInt32 uTargetSlot = (std::min)(
+        static_cast<AkUInt32>(m_pParams->RTPC.fActiveIR),
+        OKConvolutionConfig::MaxIRSlots - 1u);
+    const bool bSlotChanged = (uTargetSlot != m_uActiveIRSlot);
+
+    // Detect if ActiveIRIndex switched slots or Wwise Authoring swapped the slot's media
+    // (Phase 1/2 will preload all slots and replace SetIR() with zero-allocation SetActiveIR(uTargetSlot, fFadeTimeMs))
+    UpdateIRFromMedia(uTargetSlot, bSlotChanged);
+    m_uActiveIRSlot = uTargetSlot;
+
     const AkReal32 fMix     = std::clamp(m_pParams->RTPC.fDryWet * 0.01f, 0.0f, 1.0f);
     const AkReal32 fWetGain = fMix;
     const AkReal32 fDryGain = 1.0f - fMix;
@@ -176,36 +190,52 @@ bool OKConvolutionFX::SupportMediaRelocation() const
 
 AKRESULT OKConvolutionFX::RelocateMedia(AkUInt8* in_pNewMedia, AkUInt8* in_pOldMedia)
 {
-    // Keep our cached pointer aligned with Wwise's relocated address so
+    // Keep all cached slot pointers aligned with Wwise's relocated address so
     // UpdateIRFromMedia() does not falsely treat a memory move as a new IR.
-    if (m_pLastMediaData == in_pOldMedia)
-        m_pLastMediaData = in_pNewMedia;
+    for (AkUInt32 slot = 0; slot < OKConvolutionConfig::MaxIRSlots; ++slot)
+    {
+        if (m_mediaCache[slot].pData == in_pOldMedia)
+            m_mediaCache[slot].pData = in_pNewMedia;
+    }
 
     return AK_Success;
 }
 
-AKRESULT OKConvolutionFX::UpdateIRFromMedia(AkUInt32 in_uMediaIndex)
+bool OKConvolutionFX::RefreshMediaSlotCache(AkUInt32 in_uMediaIndex)
 {
-    if (!m_pContext || !m_pEngine)
-        return AK_Fail;
+    if (!m_pContext || in_uMediaIndex >= OKConvolutionConfig::MaxIRSlots)
+        return false;
 
     AkUInt8* pMediaData = nullptr;
     AkUInt32 uMediaSize = 0;
     m_pContext->GetPluginMedia(in_uMediaIndex, pMediaData, uMediaSize);
 
     const AkUInt32 uSignature = ComputeMediaSignature(pMediaData, uMediaSize);
+    MediaSlotCache& cache = m_mediaCache[in_uMediaIndex];
 
-    if (pMediaData == m_pLastMediaData
-        && uMediaSize == m_uLastMediaSize
-        && uSignature == m_uLastMediaSignature)
+    if (pMediaData == cache.pData
+        && uMediaSize == cache.uSize
+        && uSignature == cache.uSignature)
     {
-        return AK_Success;
+        return false;
     }
 
     // Update cache before returning so an invalid file isn't retried every audio block
-    m_pLastMediaData      = pMediaData;
-    m_uLastMediaSize      = uMediaSize;
-    m_uLastMediaSignature = uSignature;
+    cache.pData      = pMediaData;
+    cache.uSize      = uMediaSize;
+    cache.uSignature = uSignature;
+    return true;
+}
 
-    return m_pEngine->SetIR(pMediaData, uMediaSize);
+AKRESULT OKConvolutionFX::UpdateIRFromMedia(AkUInt32 in_uMediaIndex, bool in_bForceReload)
+{
+    if (!m_pContext || !m_pEngine || in_uMediaIndex >= OKConvolutionConfig::MaxIRSlots)
+        return AK_InvalidParameter;
+
+    const bool bMediaChanged = RefreshMediaSlotCache(in_uMediaIndex);
+    if (!bMediaChanged && !in_bForceReload)
+        return AK_Success;
+
+    const MediaSlotCache& cache = m_mediaCache[in_uMediaIndex];
+    return m_pEngine->SetIR(cache.pData, cache.uSize);
 }

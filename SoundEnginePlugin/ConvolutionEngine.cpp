@@ -180,12 +180,12 @@ AKRESULT ConvolutionEngine::SetIR(const AkUInt8* in_pData, AkUInt32 in_uDataSize
         return AK_InvalidFile;
 
     AkReal32* pNewSamples = static_cast<AkReal32*>(
-        AK_PLUGIN_ALLOC(m_pAllocator, static_cast<size_t>(payloadBytes))
+        AK_PLUGIN_ALLOC(m_pAllocator, payloadBytes)
     );
     if (!pNewSamples)
         return AK_InsufficientMemory;
 
-    std::memcpy(pNewSamples, in_pData + sizeof(OKIRMediaHeader), static_cast<size_t>(payloadBytes));
+    std::memcpy(pNewSamples, in_pData + sizeof(OKIRMediaHeader), payloadBytes);
 
     FreeIRAndPartitions();
 
