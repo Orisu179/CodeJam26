@@ -514,9 +514,9 @@ AK::Wwise::Plugin::ConversionResult OKConvolutionPlugin::ConvertFile(
     AK::Wwise::Plugin::IProgress* in_pProgress,
     AK::Wwise::Plugin::IWriteString* io_pError) const
 {
-    if (!in_szSourceFile || !in_szDestFile)
+    if (!in_szSourceFile || in_szSourceFile[0] == 0 || !in_szDestFile || in_szDestFile[0] == 0)
     {
-        ReportError(io_pError, "OKConvolution: Source or destination file path is null.");
+        ReportError(io_pError, "OKConvolution: Source or destination file path is empty.");
         return AK::Wwise::Plugin::ConversionFailed;
     }
 

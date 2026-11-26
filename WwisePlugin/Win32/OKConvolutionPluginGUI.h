@@ -31,8 +31,6 @@ the specific language governing permissions and limitations under the License.
 class OKConvolutionPluginGUI final
 	: public AK::Wwise::Plugin::GUIWindows
 	, public AK::Wwise::Plugin::RequestObjectMedia
-	, public AK::Wwise::Plugin::RequestPropertySet
-	, public AK::Wwise::Plugin::RequestHost
 {
 public:
 	OKConvolutionPluginGUI() = default;
@@ -41,4 +39,12 @@ public:
 		AK::Wwise::Plugin::PopulateTableItem*& out_pTable) const override;
 	bool WindowProc(AK::Wwise::Plugin::eDialog in_eDialog, HWND in_hWnd, uint32_t in_message, WPARAM in_wParam,
 		LPARAM in_lParam, LRESULT& out_lResult) override;
+	void NotifyPluginMediaChanged() override;
+
+private:
+	void BrowseAndAssignSlot(HWND in_hWnd, unsigned int in_uSlotIndex);
+	void ClearSlot(HWND in_hWnd, unsigned int in_uSlotIndex);
+	void RefreshSlotLabels(HWND in_hWnd) const;
+
+	HWND m_hWndSettings = nullptr;
 };

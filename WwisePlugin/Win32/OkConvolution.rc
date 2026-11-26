@@ -1,18 +1,40 @@
-﻿#include "resource.h"
+#include "resource.h"
 #include <winresrc.h>
 
-IDD_OKCONVOLUTION_BIG DIALOGEX 0, 0, 260, 115
+IDD_OKCONVOLUTION_BIG DIALOGEX 0, 0, 350, 174
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    PUSHBUTTON "Browse IR (.wav)...", IDC_BUTTON_BROWSE_IR, 12, 12, 110, 18
+    GROUPBOX "Impulse Response Slots", -1, 8, 6, 334, 92
 
-    LTEXT "Active IR Slot", -1, 12, 42, 80, 13
-    LTEXT "Class=SuperRange;Prop=ActiveIRIndex", IDC_RANGE_ACTIVE_IR_INDEX, 96, 40, 65, 13, WS_BORDER
+    LTEXT "Slot 0", -1, 16, 22, 26, 12
+    PUSHBUTTON "Browse...", IDC_BUTTON_BROWSE_IR_0, 46, 20, 48, 14
+    PUSHBUTTON "Clear", IDC_BUTTON_CLEAR_IR_0, 98, 20, 36, 14
+    LTEXT "(Empty)", IDC_STATIC_IR_NAME_0, 140, 21, 194, 13, SS_PATHELLIPSIS | SS_CENTERIMAGE | WS_BORDER
 
-    LTEXT "Dry Wet Mix", -1, 12, 62, 80, 13
-    LTEXT "Class=SuperRange;Prop=DryWetMix", IDC_RANGE_DRY_WET_MIX, 96, 60, 65, 13, WS_BORDER
+    LTEXT "Slot 1", -1, 16, 41, 26, 12
+    PUSHBUTTON "Browse...", IDC_BUTTON_BROWSE_IR_1, 46, 39, 48, 14
+    PUSHBUTTON "Clear", IDC_BUTTON_CLEAR_IR_1, 98, 39, 36, 14
+    LTEXT "(Empty)", IDC_STATIC_IR_NAME_1, 140, 40, 194, 13, SS_PATHELLIPSIS | SS_CENTERIMAGE | WS_BORDER
 
-    LTEXT "Cross Fade Time", -1, 12, 82, 80, 13
-    LTEXT "Class=SuperRange;Prop=CrossFadeTime", IDC_RANGE_CROSS_FADE_TIME, 96, 80, 65, 13, WS_BORDER
+    LTEXT "Slot 2", -1, 16, 60, 26, 12
+    PUSHBUTTON "Browse...", IDC_BUTTON_BROWSE_IR_2, 46, 58, 48, 14
+    PUSHBUTTON "Clear", IDC_BUTTON_CLEAR_IR_2, 98, 58, 36, 14
+    LTEXT "(Empty)", IDC_STATIC_IR_NAME_2, 140, 59, 194, 13, SS_PATHELLIPSIS | SS_CENTERIMAGE | WS_BORDER
+
+    LTEXT "Slot 3", -1, 16, 79, 26, 12
+    PUSHBUTTON "Browse...", IDC_BUTTON_BROWSE_IR_3, 46, 77, 48, 14
+    PUSHBUTTON "Clear", IDC_BUTTON_CLEAR_IR_3, 98, 77, 36, 14
+    LTEXT "(Empty)", IDC_STATIC_IR_NAME_3, 140, 78, 194, 13, SS_PATHELLIPSIS | SS_CENTERIMAGE | WS_BORDER
+
+    GROUPBOX "Parameters", -1, 8, 104, 334, 64
+
+    LTEXT "Active IR Slot", -1, 16, 120, 80, 12
+    LTEXT "Class=SuperRange;Prop=ActiveIRIndex", IDC_RANGE_ACTIVE_IR_INDEX, 100, 118, 65, 13, WS_BORDER
+
+    LTEXT "Dry Wet Mix", -1, 16, 136, 80, 12
+    LTEXT "Class=SuperRange;Prop=DryWetMix", IDC_RANGE_DRY_WET_MIX, 100, 134, 65, 13, WS_BORDER
+
+    LTEXT "Cross Fade Time", -1, 16, 152, 80, 12
+    LTEXT "Class=SuperRange;Prop=CrossFadeTime", IDC_RANGE_CROSS_FADE_TIME, 100, 150, 65, 13, WS_BORDER
 END

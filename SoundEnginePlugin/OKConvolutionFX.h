@@ -56,7 +56,8 @@ private:
   };
 
   bool RefreshMediaSlotCache(AkUInt32 in_uMediaIndex);
-  AKRESULT UpdateIRFromMedia(AkUInt32 in_uMediaIndex, bool in_bForceReload = false);
+  AKRESULT UpdateIRFromMedia(AkUInt32 in_uMediaIndex);
+  AKRESULT SyncAllMediaSlots();
 
   OKConvolutionFXParams* m_pParams;
   AK::IAkPluginMemAlloc* m_pAllocator;
